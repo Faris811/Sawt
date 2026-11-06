@@ -3,14 +3,14 @@
 تطبيق تواصل عربي مبسّط يحوّل النص إلى كلام. يدعم Gemini TTS لصوت أكثر تعبيرًا، مع أصوات Microsoft السعودية كخيار بديل.
 
 ## المزايا
-- محرك Gemini TTS لإنتاج كلام أكثر طبيعية وتعبيرًا، مع توجيه النطق إلى العربية السعودية المحكية.
+- محرك Gemini TTS لإنتاج كلام أكثر طبيعية وتعبيرًا، مع توجيه الأداء إلى العربية السعودية المحكية.
 - أصوات Microsoft سعودية (رجل وامرأة) كخيار بديل لا يحتاج مفتاح API.
 - التحكم بسرعة الإلقاء وطريقة الأداء.
 - جمل جاهزة مصنفة حسب الاحتياجات والمشاعر والأسئلة والمحادثة والصحة.
 - حفظ الجمل المفضلة وحذفها.
 - اقتراحات محلية مبنية على الاستخدام.
 - مساعد Gemini اختياري لاقتراح الجمل وإعادة صياغتها.
-- تشغيل الصوت وتحميله بصيغة MP3.
+- تشغيل الصوت وتحميله بصيغة WAV أو MP3 حسب المحرك.
 - واجهة عربية متجاوبة.
 
 ## التشغيل محليًا
@@ -19,30 +19,38 @@
 ```bash
 python -m venv .venv
 # Windows PowerShell:
-.venv\Scripts\Activate.ps1
+.venv\\Scripts\\Activate.ps1
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
 ثم افتح http://localhost:8501
 
-## تشغيل المساعد الذكي (اختياري)
-أضف مفتاح Gemini في متغير البيئة `GEMINI_API_KEY` أو في Streamlit Secrets:
+## تفعيل Gemini المجاني
+1. أنشئ مفتاح API من [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. افتح إعدادات التطبيق في Streamlit Community Cloud ثم **Secrets**.
+3. أضف:
 
 ```toml
-GEMINI_API_KEY = "YOUR_API_KEY"
+GEMINI_API_KEY = "ضع_مفتاحك_هنا"
 GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_TTS_MODEL = "gemini-3.8-flash-tts"
 ```
 
-لا ترفع المفتاح إلى GitHub. التطبيق يعمل بدون Gemini.
+4. احفظ الإعدادات وأعد تشغيل التطبيق.
+
+يمكنك محليًا وضع القيم نفسها في `.streamlit/secrets.toml`. لا ترفع هذا الملف إلى GitHub ولا تشارك المفتاح.
+
+صفحة أسعار Google تعرض طبقة مجانية لنماذج Gemini TTS، لكن توجد حدود استخدام وقد تتغير. إذا لم تضف المفتاح، سيبقى محرك Microsoft السعودي متاحًا دون API.
 
 ## النشر على Streamlit Community Cloud
 1. افتح https://share.streamlit.io/
-2. اختر هذا المستودع والفرع `main`.
+2. اختر المستودع `Faris811/Sawt` والفرع `main`.
 3. اختر `app.py` كملف رئيسي ثم Deploy.
-4. أضف Gemini key من App settings → Secrets عند الحاجة.
+4. أضف المفتاح من **App settings → Secrets**.
 
 ## ملاحظات
-- Edge TTS يحتاج اتصال إنترنت.
+- Gemini TTS يُرجع ملف WAV، بينما Edge TTS يُرجع MP3.
+- اتصال الإنترنت مطلوب لتوليد الصوت.
 - البيانات المحفوظة تُخزّن في `data.json` محليًا. على Streamlit Cloud قد لا تبقى البيانات بعد إعادة تشغيل التطبيق أو إعادة النشر.
 - لا تشارك مفتاح Gemini علنًا.
