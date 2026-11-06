@@ -101,12 +101,17 @@ def gemini_tts(text: str, voice: str, delivery: str) -> bytes:
         "نبرة أعلى": "with a slightly brighter, lively tone",
         "نبرة أخفض": "with a slightly lower, calm tone",
     }.get(delivery, "at a natural conversational pace")
+    speaker = "a native Saudi male speaker" if voice == "Puck" else "a native Saudi female speaker"
     style = (
-        "Speak the supplied text in fluent, natural Saudi colloquial Arabic. "
-        "Sound like a real native Saudi Arabic speaker in a relaxed everyday conversation. "
-        "Use smooth connected phrasing, natural rhythm and pronunciation. "
-        "Avoid stuttering, repetitions, hesitation sounds, robotic cadence, and unnecessary pauses. "
-        "Do not add, omit, translate, or paraphrase any words. "
+        f"Speak as {speaker}, using clear, natural Saudi colloquial Arabic (a neutral Saudi dialect). "
+        "Pronounce every Arabic word accurately as a whole word, never spell it letter by letter. "
+        "Articulate Arabic consonants clearly, especially ع، ح، خ، غ، ق، ص، ض، ط، ظ، ث، ذ, "
+        "and keep their correct Arabic sounds. Do not replace them with unrelated sounds or omit them. "
+        "Use natural Saudi vowel sounds and connected speech, with smooth syllables and no clipped endings. "
+        "Sound warm, fluent and human, like an everyday conversation, not a formal newsreader. "
+        "Avoid stuttering, repeated syllables, hesitation sounds, vocal glitches, robotic cadence, "
+        "and unnecessary pauses. Read punctuation naturally. "
+        "Speak only the exact supplied words: do not add, omit, translate, or paraphrase anything. "
         + pace + "."
     )
     payload = {
@@ -233,8 +238,10 @@ if quick:
 
 st.subheader("إعدادات الصوت")
 gemini_ready = bool(gemini_key())
-engine_options = ["Gemini الطبيعي (أكثر تعبيرًا)"] if gemini_ready else []
-engine_options.append("Microsoft السعودي (بدون مفتاح)")
+# Prefer the dedicated Saudi Arabic voices by default; Gemini remains available as an alternative.
+engine_options = ["Microsoft السعودي (نطق سعودي واضح)"]
+if gemini_ready:
+    engine_options.append("Gemini الطبيعي (تجريبي)")
 engine_label = st.radio(
     "محرك الصوت",
     engine_options,
@@ -250,7 +257,7 @@ voice_name = st.radio("اختر الصوت", list(voice_options), horizontal=Tru
 delivery_name = st.selectbox("طريقة الإلقاء", list(DELIVERY))
 rate, pitch = DELIVERY[delivery_name]
 if use_gemini_tts:
-    st.caption("يستخدم Gemini TTS لإلقاء عربي محادثي أكثر سلاسة. قد يختلف مدى إتقان اللهجة السعودية حسب الجملة والصوت.")
+    st.caption("جرّب هذا المحرك إذا أردت إلقاءً تعبيريًا؛ لأوضح نطق سعودي مباشر، اختر Microsoft السعودي.")
 
 with st.expander("✨ المساعد الذكي (اختياري)"):
     if not gemini_key():
@@ -329,7 +336,7 @@ if st.session_state.pending:
 if st.session_state.audio:
     st.subheader("الصوت الناتج")
     audio_format = st.session_state.get("audio_format", "audio/mp3")
-    st.audio(st.session_state.audio, format=audio_format)
+    st.audio(st.session_state.audio, format=audio_format, autoplay=True)
     extension = "wav" if audio_format == "audio/wav" else "mp3"
     mime = "audio/wav" if extension == "wav" else "audio/mpeg"
     st.download_button(
