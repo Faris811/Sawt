@@ -223,7 +223,7 @@ sign_text = st.session_state.message.strip()
 if sign_text:
     st.subheader("🤟 لغة الإشارة السعودية")
     st.caption("ابحث عن كل كلمة في مكتبة الجمعية السعودية للإعاقة السمعية. النتائج تفتح صور الإشارة الأصلية عند توفرها.")
-    sign_words = list(dict.fromkeys(re.findall(r"[\\u0621-\\u064A]+", sign_text)))
+    sign_words = list(dict.fromkeys(re.findall(r"[\u0621-\u064A\u0660-\u0669]+", sign_text)))
     if sign_words:
         sign_cols = st.columns(2)
         for i, word in enumerate(sign_words[:8]):
