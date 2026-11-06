@@ -4,8 +4,10 @@ import asyncio
 import base64
 import json
 import os
+import re
 import urllib.error
 import urllib.request
+from urllib.parse import quote_plus
 from pathlib import Path
 from typing import Any
 
@@ -215,6 +217,30 @@ st.caption("اكتب ما تريد قوله، وسيقوم صَوْت بنطقه
 st.divider()
 
 st.text_area("اكتب هنا", key="message", height=125, placeholder="اكتب الجملة التي تريد قولها...", label_visibility="collapsed")
+
+# Saudi Sign Language helper: point to the Saudi Association's verified sign library.
+sign_text = st.session_state.message.strip()
+if sign_text:
+    st.subheader("🤟 لغة الإشارة السعودية")
+    st.caption("ابحث عن كل كلمة في مكتبة الجمعية السعودية للإعاقة السمعية. النتائج تفتح صور الإشارة الأصلية عند توفرها.")
+    sign_words = list(dict.fromkeys(re.findall(r"[\\u0621-\\u064A]+", sign_text)))
+    if sign_words:
+        sign_cols = st.columns(2)
+        for i, word in enumerate(sign_words[:8]):
+            image_search = "https://www.google.com/search?tbm=isch&q=" + quote_plus(
+                f'site:sshi.sa/category "{word}" لغة الإشارة السعودية'
+            )
+            sign_cols[i % 2].link_button(f"🖼️ إشارة: {word}", image_search, use_container_width=True)
+        if len(sign_words) > 8:
+            st.caption("تم عرض أول ٨ كلمات. ابحث عن بقية الكلمات من المكتبة.")
+    st.link_button("📚 فتح مكتبة لغة الإشارة السعودية", "https://sshi.sa/", use_container_width=True)
+    st.caption("إذا لم توجد للكلمة إشارة مستقلة، يمكن تهجئتها بحروف الأصابع.")
+    st.image(
+        "https://sshi.sa/assets/%D8%A3%D8%A8%D8%AC%D8%AF%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A7%D8%B4%D8%A7%D8%B1%D8%A9%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-c3f05c67.webp",
+        caption="أبجدية الأصابع العربية — من مكتبة لغة الإشارة السعودية",
+        use_container_width=True,
+    )
+
 c1, c2, c3 = st.columns([3, 1, 1])
 c1.button("🔊 تكلم", type="primary", on_click=queue_speech)
 c2.button("مسح", on_click=clear_message)
