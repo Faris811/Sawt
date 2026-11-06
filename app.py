@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +88,67 @@ def ask_gemini(prompt: str) -> str:
         raise RuntimeError("لم يرجع المساعد الذكي إجابة")
     return answer.strip()
 
+def gemini_tts(text: str, voice: str, delivery: str) -> bytes:
+    """Generate natural speech with Gemini TTS. Returns a complete WAV file."""
+    key = gemini_key()
+    if not key:
+        raise RuntimeError("أضف GEMINI_API_KEY لتفعيل صوت Gemini")
+    model = os.getenv("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
+    pace = {
+        "طبيعي": "at a natural conversational pace",
+        "أبطأ": "slightly slower, calm and clear",
+        "أسرع قليلًا": "slightly quicker but still clear and natural",
+        "نبرة أعلى": "with a slightly brighter, lively tone",
+        "نبرة أخفض": "with a slightly lower, calm tone",
+    }.get(delivery, "at a natural conversational pace")
+    style = (
+        "Speak the supplied text in fluent, natural Saudi colloquial Arabic. "
+        "Sound like a real native Saudi Arabic speaker in a relaxed everyday conversation. "
+        "Use smooth connected phrasing, natural rhythm and pronunciation. "
+        "Avoid stuttering, repetitions, hesitation sounds, robotic cadence, and unnecessary pauses. "
+        "Do not add, omit, translate, or paraphrase any words. "
+        + pace + "."
+    )
+    payload = {
+        "model": model,
+        "input": [{
+            "type": "user_input",
+            "content": [{
+                "type": "text",
+                "text": text,
+                "annotations": [{
+                    "type": "speech_metadata",
+                    "style": style,
+                }],
+            }],
+        }],
+        "response_format": {"type": "audio"},
+        "generation_config": {"speech_config": [{"voice": voice}]},
+    }
+    request = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini TTS API ({exc.code}): {details[:700]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"تعذر الاتصال بخدمة Gemini: {exc.reason}") from exc
+
+    audio_data = (result.get("output_audio") or {}).get("data")
+    if not audio_data:
+        raise RuntimeError("Gemini لم يُرجع ملفًا صوتيًا")
+    return base64.b64decode(audio_data)
+
+
 def parse_list(raw: str, limit: int = 6) -> list[str]:
     cleaned = raw.replace("```json", "").replace("```", "").strip()
     left, right = cleaned.find("["), cleaned.rfind("]")
@@ -96,7 +160,13 @@ def parse_list(raw: str, limit: int = 6) -> list[str]:
     return [str(x).strip() for x in values if str(x).strip()][:limit]
 
 @st.cache_data(show_spinner=False, max_entries=200)
-def text_to_speech(text: str, voice: str, rate: str, pitch: str) -> bytes:
+def text_to_speech(
+    text: str, engine: str, voice: str, delivery: str,
+    rate: str, pitch: str, api_key: str = "",
+) -> tuple[bytes, str]:
+    if engine == "Gemini TTS":
+        return gemini_tts(text, voice, delivery), "audio/wav"
+
     async def generate() -> bytes:
         communicator = edge_tts.Communicate(text=text, voice=voice, rate=rate, pitch=pitch)
         audio = bytearray()
@@ -106,7 +176,7 @@ def text_to_speech(text: str, voice: str, rate: str, pitch: str) -> bytes:
         if not audio:
             raise RuntimeError("لم يتم استلام ملف صوتي")
         return bytes(audio)
-    return asyncio.run(generate())
+    return asyncio.run(generate()), "audio/mp3"
 
 def select_phrase(value: str) -> None:
     st.session_state.message = value
@@ -162,9 +232,25 @@ if quick:
         cols[i % 2].button(phrase, key=f"quick_{i}", on_click=select_phrase, args=(phrase,))
 
 st.subheader("إعدادات الصوت")
-voice_name = st.radio("اختر الصوت", list(VOICES), horizontal=True)
+gemini_ready = bool(gemini_key())
+engine_options = ["Gemini الطبيعي (أكثر تعبيرًا)"] if gemini_ready else []
+engine_options.append("Microsoft السعودي (بدون مفتاح)")
+engine_label = st.radio(
+    "محرك الصوت",
+    engine_options,
+    horizontal=False,
+    help="Gemini يولّد صوتًا أكثر تعبيرًا. صوت Microsoft يستخدم أصواتًا سعودية محددة.",
+)
+use_gemini_tts = engine_label.startswith("Gemini")
+if use_gemini_tts:
+    voice_options = {"👨 صوت رجالي": "Puck", "👩 صوت نسائي": "Kore"}
+else:
+    voice_options = VOICES
+voice_name = st.radio("اختر الصوت", list(voice_options), horizontal=True)
 delivery_name = st.selectbox("طريقة الإلقاء", list(DELIVERY))
 rate, pitch = DELIVERY[delivery_name]
+if use_gemini_tts:
+    st.caption("يستخدم Gemini TTS لإلقاء عربي محادثي أكثر سلاسة. قد يختلف مدى إتقان اللهجة السعودية حسب الجملة والصوت.")
 
 with st.expander("✨ المساعد الذكي (اختياري)"):
     if not gemini_key():
@@ -226,15 +312,32 @@ if st.session_state.pending:
     save_data()
     try:
         with st.spinner("جاري تجهيز الصوت..."):
-            st.session_state.audio = text_to_speech(phrase, VOICES[voice_name], rate, pitch)
+            engine = "Gemini TTS" if use_gemini_tts else "Edge TTS"
+            st.session_state.audio, st.session_state.audio_format = text_to_speech(
+                phrase,
+                engine,
+                voice_options[voice_name],
+                delivery_name,
+                rate,
+                pitch,
+                gemini_key() or "",
+            )
     except Exception as exc:
         st.session_state.audio = None
-        st.error(f"تعذر توليد الصوت. تحقق من الإنترنت وحاول مجددًا. التفاصيل: {exc}")
+        st.error(f"تعذر توليد الصوت. تحقق من اتصال الإنترنت ومفتاح Gemini ثم حاول مجددًا. التفاصيل: {exc}")
 
 if st.session_state.audio:
     st.subheader("الصوت الناتج")
-    st.audio(st.session_state.audio, format="audio/mp3")
-    st.download_button("⬇️ تحميل الصوت MP3", st.session_state.audio, "sawt.mp3", "audio/mpeg")
+    audio_format = st.session_state.get("audio_format", "audio/mp3")
+    st.audio(st.session_state.audio, format=audio_format)
+    extension = "wav" if audio_format == "audio/wav" else "mp3"
+    mime = "audio/wav" if extension == "wav" else "audio/mpeg"
+    st.download_button(
+        f"⬇️ تحميل الصوت {extension.upper()}",
+        st.session_state.audio,
+        f"sawt.{extension}",
+        mime,
+    )
 
 st.divider()
 st.caption("صَوْت | يتطلب اتصال إنترنت لتوليد الصوت. التخزين المحلي قد يُمسح عند إعادة تشغيل Streamlit Cloud.")
