@@ -188,6 +188,7 @@ def select_phrase(value: str) -> None:
 
 def queue_speech() -> None:
     st.session_state.pending = st.session_state.message.strip()
+    st.session_state.audio_version = int(st.session_state.get("audio_version", 0)) + 1
 
 def clear_message() -> None:
     st.session_state.message = ""
@@ -206,6 +207,7 @@ if "ready" not in st.session_state:
     st.session_state.message = ""
     st.session_state.pending = ""
     st.session_state.audio = None
+    st.session_state.audio_version = 0
     st.session_state.ai_phrases = []
 
 st.title("صَوْت 🔊")
@@ -336,7 +338,12 @@ if st.session_state.pending:
 if st.session_state.audio:
     st.subheader("الصوت الناتج")
     audio_format = st.session_state.get("audio_format", "audio/mp3")
-    st.audio(st.session_state.audio, format=audio_format, autoplay=True)
+    st.audio(
+        st.session_state.audio,
+        format=audio_format,
+        autoplay=True,
+        alt=f"الصوت الناتج، تشغيل رقم {st.session_state.audio_version}",
+    )
     extension = "wav" if audio_format == "audio/wav" else "mp3"
     mime = "audio/wav" if extension == "wav" else "audio/mpeg"
     st.download_button(
