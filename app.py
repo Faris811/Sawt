@@ -47,11 +47,13 @@ VOICES = {
     "👩 امرأة سعودية": "ar-SA-ZariyahNeural",
 }
 DELIVERY = {
+    # A small reduction in speed improves consonant clarity without making speech unnaturally slow.
+    "واضح ومتوازن (مقترح)": ("-5%", "+0Hz"),
     "طبيعي": ("+0%", "+0Hz"),
-    "أبطأ": ("-12%", "+0Hz"),
-    "أسرع قليلًا": ("+8%", "+0Hz"),
-    "نبرة أعلى": ("+0%", "+15Hz"),
-    "نبرة أخفض": ("+0%", "-12Hz"),
+    "أبطأ": ("-10%", "+0Hz"),
+    "أسرع قليلًا": ("+5%", "+0Hz"),
+    "نبرة أعلى": ("+0%", "+10Hz"),
+    "نبرة أخفض": ("+0%", "-8Hz"),
 }
 PHRASES = {
     "احتياجات": ["أبي ماء", "أبي أكل", "أبي أروح الحمام", "أحتاج مساعدة", "أبي أنام", "أبي دوائي", "أنا تعبان", "أبي أطلع برا"],
@@ -199,8 +201,21 @@ def text_to_speech(
         return bytes(audio)
     return asyncio.run(generate()), "audio/mp3"
 
+def prepare_speech_text(value: str) -> str:
+    """Clean accidental spacing while preserving Arabic letters and words exactly."""
+    value = value.replace("\\r\\n", "\\n").replace("\\r", "\\n")
+    lines = [re.sub(r"\\s+", " ", line).strip() for line in value.split("\\n")]
+    # A line break is a natural pause; keep it as sentence punctuation for TTS.
+    return ". ".join(line for line in lines if line).strip()
+
 def select_phrase(value: str) -> None:
     st.session_state.message = value
+
+def queue_pronunciation_test() -> None:
+    sample = "ثلاثة أشياء: خالد أخذ خبزًا، ثم شرب قهوة. أحتاج مساعدة، لو سمحت."
+    st.session_state.message = sample
+    st.session_state.pending = sample
+    st.session_state.audio_version = int(st.session_state.get("audio_version", 0)) + 1
 
 def queue_speech() -> None:
     st.session_state.pending = st.session_state.message.strip()
@@ -299,8 +314,20 @@ if use_gemini_tts:
 else:
     voice_options = VOICES
 voice_name = st.radio("اختر الصوت", list(voice_options), horizontal=True)
-delivery_name = st.selectbox("طريقة الإلقاء", list(DELIVERY))
+delivery_name = st.selectbox(
+    "طريقة الإلقاء",
+    list(DELIVERY),
+    index=0,
+    help="الإعداد المقترح يبطّئ الصوت قليلًا فقط لتحسين وضوح الحروف من دون إطالة الكلام.",
+)
 rate, pitch = DELIVERY[delivery_name]
+st.caption("لأفضل نطق: اكتب الجملة كما تُقال طبيعيًا، ولا تفصل حروف الكلمة. استخدم الفاصلة أو النقطة عند الحاجة إلى وقفة قصيرة.")
+st.button(
+    "🗣️ اختبار وضوح الحروف",
+    on_click=queue_pronunciation_test,
+    help="يشغّل جملة قصيرة لاختبار وضوح الحروف العربية وسلاسة النطق.",
+    use_container_width=True,
+)
 if use_gemini_tts:
     st.caption("جرّب هذا المحرك إذا أردت إلقاءً تعبيريًا؛ لأوضح نطق سعودي مباشر، اختر Microsoft السعودي.")
 
@@ -365,8 +392,9 @@ if st.session_state.pending:
     try:
         with st.spinner("جاري تجهيز الصوت..."):
             engine = "Gemini TTS" if use_gemini_tts else "Edge TTS"
+            speech_text = prepare_speech_text(phrase)
             st.session_state.audio, st.session_state.audio_format = text_to_speech(
-                phrase,
+                speech_text,
                 engine,
                 voice_options[voice_name],
                 delivery_name,
