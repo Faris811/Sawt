@@ -21,10 +21,24 @@ st.set_page_config(page_title="صَوْت | Sawt", page_icon="🔊", layout="cen
 st.markdown("""
 <style>
 .stApp { direction: rtl; }
-textarea { direction: rtl !important; font-size: 22px !important; }
+.block-container { max-width: 820px; padding-top: 2rem; padding-bottom: 3rem; }
+textarea { direction: rtl !important; font-size: 20px !important; line-height: 1.8 !important; }
 input { direction: rtl; }
-.stButton > button { min-height: 3rem; width: 100%; border-radius: 12px; white-space: normal; }
-div[data-testid="stAudio"] { direction: ltr; }
+.stButton > button, .stDownloadButton > button, [data-testid="stLinkButton"] a {
+    min-height: 2.9rem; width: 100%; border-radius: 14px;
+    white-space: normal; font-weight: 600; transition: transform .15s ease, box-shadow .15s ease;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    transform: translateY(-1px); box-shadow: 0 5px 16px rgba(0,0,0,.08);
+}
+div[data-testid="stAudio"] { direction: ltr; border-radius: 14px; }
+div[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 18px; }
+h1, h2, h3 { letter-spacing: -.35px; }
+[data-testid="stCaptionContainer"] { line-height: 1.7; }
+@media (max-width: 640px) {
+    .block-container { padding: 1rem .8rem 2rem; }
+    textarea { font-size: 18px !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,9 +256,12 @@ if sign_text:
     )
 
 c1, c2, c3 = st.columns([3, 1, 1])
-c1.button("🔊 تكلم", type="primary", on_click=queue_speech)
-c2.button("مسح", on_click=clear_message)
-c3.button("⭐ حفظ", on_click=save_message)
+c1.button("🔊 تكلم", type="primary", on_click=queue_speech, disabled=not bool(st.session_state.message.strip()))
+c2.button("مسح", on_click=clear_message, disabled=not bool(st.session_state.message.strip()))
+c3.button("⭐ حفظ", on_click=save_message, disabled=not bool(st.session_state.message.strip()))
+
+# Keep the generated player directly below the main controls, not at the bottom of the page.
+audio_placeholder = st.container()
 
 # Quick suggestions are ranked by previous use and saved phrases.
 query = st.session_state.message.strip()
@@ -361,23 +378,42 @@ if st.session_state.pending:
         st.session_state.audio = None
         st.error(f"تعذر توليد الصوت. تحقق من اتصال الإنترنت ومفتاح Gemini ثم حاول مجددًا. التفاصيل: {exc}")
 
-if st.session_state.audio:
-    st.subheader("الصوت الناتج")
-    audio_format = st.session_state.get("audio_format", "audio/mp3")
-    st.audio(
-        st.session_state.audio,
-        format=audio_format,
-        autoplay=True,
-        alt=f"الصوت الناتج، تشغيل رقم {st.session_state.audio_version}",
-    )
-    extension = "wav" if audio_format == "audio/wav" else "mp3"
-    mime = "audio/wav" if extension == "wav" else "audio/mpeg"
-    st.download_button(
-        f"⬇️ تحميل الصوت {extension.upper()}",
-        st.session_state.audio,
-        f"sawt.{extension}",
-        mime,
-    )
+with audio_placeholder:
+    if st.session_state.audio:
+        st.subheader("🎧 الصوت الناتج")
+        audio_format = st.session_state.get("audio_format", "audio/mp3")
+        st.audio(
+            st.session_state.audio,
+            format=audio_format,
+            autoplay=True,
+            alt=f"الصوت الناتج، تشغيل رقم {st.session_state.audio_version}",
+        )
+        extension = "wav" if audio_format == "audio/wav" else "mp3"
+        mime = "audio/wav" if extension == "wav" else "audio/mpeg"
+        st.download_button(
+            f"⬇️ تحميل الصوت {extension.upper()}",
+            st.session_state.audio,
+            f"sawt.{extension}",
+            mime,
+        )
+
+# A small, useful recent-history view; most-used phrases remain easy to find.
+recent_history = sorted(
+    st.session_state.history.items(),
+    key=lambda item: int(item[1] or 0),
+    reverse=True,
+)[:8]
+if recent_history:
+    with st.expander("🕘 سجل العبارات المستخدمة"):
+        st.caption("تُرتّب العبارات حسب عدد مرات استخدامها على هذا التشغيل.")
+        history_cols = st.columns(2)
+        for i, (phrase, count) in enumerate(recent_history):
+            history_cols[i % 2].button(
+                f"{phrase}  ·  {count}×",
+                key=f"history_{i}",
+                on_click=select_phrase,
+                args=(phrase,),
+            )
 
 st.divider()
 st.caption("صَوْت | يتطلب اتصال إنترنت لتوليد الصوت. التخزين المحلي قد يُمسح عند إعادة تشغيل Streamlit Cloud.")
