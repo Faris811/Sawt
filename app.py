@@ -203,8 +203,8 @@ def text_to_speech(
 
 def prepare_speech_text(value: str) -> str:
     """Clean accidental spacing while preserving Arabic letters and words exactly."""
-    value = value.replace("\\r\\n", "\\n").replace("\\r", "\\n")
-    lines = [re.sub(r"\\s+", " ", line).strip() for line in value.split("\\n")]
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [re.sub(r"\s+", " ", line).strip() for line in value.split("\n")]
     # A line break is a natural pause; keep it as sentence punctuation for TTS.
     return ". ".join(line for line in lines if line).strip()
 
