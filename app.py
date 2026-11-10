@@ -405,7 +405,7 @@ recent_history = sorted(
 )[:8]
 if recent_history:
     with st.expander("🕘 سجل العبارات المستخدمة"):
-        st.caption("تُرتّب العبارات حسب عدد مرات استخدامها على هذا التشغيل.")
+        st.caption("تُرتّب العبارات حسب عدد مرات الاستخدام المسجّلة.")
         history_cols = st.columns(2)
         for i, (phrase, count) in enumerate(recent_history):
             history_cols[i % 2].button(
